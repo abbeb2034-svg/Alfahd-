@@ -1,0 +1,695 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is timestamp && ts <= request.time;
+    }
+
+    function isStr(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function isOptionalStr(data, key, maxLen) {
+      return !(key in data) || data[key] == null || (data[key] is string && data[key].size() <= maxLen);
+    }
+
+    function isOptionalBool(data, key) {
+      return !(key in data) || data[key] is bool;
+    }
+
+    // Verified email check prevents unverified-email spoofing attacks
+    function isBootstrapAdmin() {
+      return isSignedIn() &&
+             'email_verified' in request.auth.token &&
+             request.auth.token.email_verified == true &&
+             'email' in request.auth.token &&
+             request.auth.token.email == 'abbeb2031@gmail.com';
+    }
+
+    function hasProfile() {
+      return isSignedIn() &&
+             exists(/databases/$(database)/documents/profiles/$(request.auth.uid));
+    }
+
+    function myProfile() {
+      return get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data;
+    }
+
+    function isActiveUser() {
+      return hasProfile() && myProfile().isActive == true;
+    }
+
+    function isAdmin() {
+      return isBootstrapAdmin() || (isActiveUser() && myProfile().role == 'admin');
+    }
+
+    function canAddCitizens() {
+      return isAdmin() || (isActiveUser() && myProfile().canAddCitizen == true);
+    }
+
+    function canEditCitizens() {
+      return isAdmin() || (isActiveUser() && myProfile().canEditCitizen == true);
+    }
+
+    function canDeleteCitizens() {
+      return isAdmin() || (isActiveUser() && myProfile().canDeleteCitizen == true);
+    }
+
+    function canManageAreas() {
+      return isAdmin() || (isActiveUser() && myProfile().canManageAreas == true);
+    }
+
+    function canManageAid() {
+      return isAdmin() || (isActiveUser() && myProfile().canManageAid == true);
+    }
+
+    // --- Schema Validation Helpers ---
+
+    function isValidProfile(data) {
+      return isValidId(data.ownerUid) &&
+             isStr(data.username, 2, 64) &&
+             isStr(data.fullName, 1, 150) &&
+             isOptionalStr(data, 'email', 160) &&
+             isOptionalStr(data, 'phone', 40) &&
+             data.role in ['admin', 'employee', 'aqil', 'representative'] &&
+             data.isActive is bool &&
+             isOptionalBool(data, 'canAddCitizen') &&
+             isOptionalBool(data, 'canEditCitizen') &&
+             isOptionalBool(data, 'canDeleteCitizen') &&
+             isOptionalBool(data, 'canViewReports') &&
+             isOptionalBool(data, 'canExport') &&
+             isOptionalBool(data, 'canManageAid') &&
+             isOptionalBool(data, 'canManageAreas') &&
+             isOptionalBool(data, 'canManageUsers') &&
+             isOptionalBool(data, 'canBackupRestore') &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidNeighborhood(data) {
+      return isValidId(data.ownerUid) &&
+             isStr(data.name, 1, 150) &&
+             isOptionalStr(data, 'governorate', 100) &&
+             isOptionalStr(data, 'district', 100) &&
+             isOptionalStr(data, 'aqilProfileId', 128) &&
+             isOptionalStr(data, 'aqilName', 150) &&
+             isOptionalStr(data, 'aqilPhone', 40) &&
+             isOptionalStr(data, 'notes', 500) &&
+             isOptionalStr(data, 'createdByName', 150) &&
+             data.isDeleted is bool &&
+             data.syncVersion is int && data.syncVersion >= 1 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidResidentialSquare(data) {
+      return isValidId(data.ownerUid) &&
+             isValidId(data.neighborhoodId) &&
+             isStr(data.name, 1, 150) &&
+             isOptionalStr(data, 'squareCode', 60) &&
+             isOptionalStr(data, 'representativeProfileId', 128) &&
+             isOptionalStr(data, 'representativeName', 150) &&
+             isOptionalStr(data, 'representativePhone', 40) &&
+             isOptionalStr(data, 'notes', 500) &&
+             isOptionalStr(data, 'createdByName', 150) &&
+             data.isDeleted is bool &&
+             data.syncVersion is int && data.syncVersion >= 1 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidRepresentative(data) {
+      return isValidId(data.ownerUid) &&
+             isValidId(data.profileId) &&
+             data.roleType in ['aqil', 'representative'] &&
+             isValidId(data.neighborhoodId) &&
+             isOptionalStr(data, 'squareId', 128) &&
+             isStr(data.fullName, 1, 150) &&
+             isOptionalStr(data, 'phone', 40) &&
+             data.isCurrent is bool &&
+             isOptionalStr(data, 'notes', 500) &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidPerson(data) {
+      return isValidId(data.ownerUid) &&
+             isStr(data.citizenCode, 1, 64) &&
+             isStr(data.fullName, 1, 200) &&
+             isOptionalStr(data, 'idType', 60) &&
+             isOptionalStr(data, 'nationalId', 64) &&
+             isOptionalStr(data, 'idIssueDate', 40) &&
+             isOptionalStr(data, 'phone', 40) &&
+             isOptionalStr(data, 'governorate', 100) &&
+             isOptionalStr(data, 'district', 100) &&
+             isValidId(data.neighborhoodId) &&
+             isValidId(data.squareId) &&
+             isOptionalStr(data, 'occupation', 120) &&
+             data.familySize is int && data.familySize >= 1 && data.familySize <= 100 &&
+             isOptionalStr(data, 'housingType', 60) &&
+             isOptionalStr(data, 'housingStatus', 60) &&
+             isOptionalStr(data, 'displacementDate', 40) &&
+             isOptionalStr(data, 'healthStatus', 80) &&
+             isOptionalStr(data, 'healthDetails', 300) &&
+             isOptionalStr(data, 'lastAidDate', 40) &&
+             isOptionalStr(data, 'notes', 1000) &&
+             isOptionalStr(data, 'createdByName', 150) &&
+             data.isDeleted is bool &&
+             data.syncVersion is int && data.syncVersion >= 1 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidIdentityDocument(data) {
+      return isValidId(data.ownerUid) &&
+             isValidId(data.personId) &&
+             isStr(data.documentType, 1, 80) &&
+             data.side in ['front', 'back', 'single'] &&
+             isOptionalStr(data, 'remoteStoragePath', 300) &&
+             isOptionalStr(data, 'mimeType', 80) &&
+             (!('fileSizeBytes' in data) || (data.fileSizeBytes is int && data.fileSizeBytes >= 0)) &&
+             isOptionalStr(data, 'sha256Checksum', 128) &&
+             isOptionalBool(data, 'uploaded') &&
+             data.isDeleted is bool &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidAidProgram(data) {
+      return isValidId(data.ownerUid) &&
+             isStr(data.name, 1, 200) &&
+             isStr(data.aidType, 1, 80) &&
+             isOptionalStr(data, 'donorName', 150) &&
+             isStr(data.distributionDate, 1, 40) &&
+             isOptionalStr(data, 'unitLabel', 60) &&
+             (!('defaultQuantity' in data) || (data.defaultQuantity is number && data.defaultQuantity >= 0)) &&
+             (!('defaultAmount' in data) || (data.defaultAmount is number && data.defaultAmount >= 0)) &&
+             isOptionalStr(data, 'status', 60) &&
+             isOptionalStr(data, 'notes', 500) &&
+             isOptionalStr(data, 'createdByName', 150) &&
+             data.isDeleted is bool &&
+             data.syncVersion is int && data.syncVersion >= 1 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidAidBeneficiary(data) {
+      return isValidId(data.ownerUid) &&
+             isValidId(data.programId) &&
+             isValidId(data.personId) &&
+             (!('allocatedQuantity' in data) || (data.allocatedQuantity is number && data.allocatedQuantity >= 0)) &&
+             (!('allocatedAmount' in data) || (data.allocatedAmount is number && data.allocatedAmount >= 0)) &&
+             data.isApproved is bool &&
+             isOptionalStr(data, 'notes', 500) &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidAidDistribution(data) {
+      return isValidId(data.ownerUid) &&
+             isValidId(data.programId) &&
+             isOptionalStr(data, 'beneficiaryId', 128) &&
+             isValidId(data.personId) &&
+             (!('quantityDelivered' in data) || (data.quantityDelivered is number && data.quantityDelivered >= 0)) &&
+             (!('amountDelivered' in data) || (data.amountDelivered is number && data.amountDelivered >= 0)) &&
+             isStr(data.receivedStatus, 1, 60) &&
+             isOptionalStr(data, 'responsibleEmployeeName', 150) &&
+             isOptionalStr(data, 'notes', 500) &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidAppSettings(data) {
+      return isValidId(data.ownerUid) &&
+             isStr(data.organizationTitle, 1, 200) &&
+             isOptionalStr(data, 'headerSubtitle', 250) &&
+             isOptionalStr(data, 'headerRightText', 400) &&
+             isOptionalStr(data, 'headerLeftText', 400) &&
+             isStr(data.headerFontFamily, 1, 60) &&
+             data.headerFontSizeSp is number && data.headerFontSizeSp >= 8 && data.headerFontSizeSp <= 32 &&
+             isOptionalStr(data, 'defaultGovernorate', 100) &&
+             isOptionalStr(data, 'defaultDistrict', 100) &&
+             isOptionalStr(data, 'defaultPaperSize', 20) &&
+             isOptionalStr(data, 'defaultOrientation', 20) &&
+             isOptionalBool(data, 'autoSyncEnabled') &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidAuditLog(data) {
+      return isValidId(data.ownerUid) &&
+             isStr(data.actorUsername, 1, 80) &&
+             isStr(data.actionType, 1, 40) &&
+             isStr(data.tableName, 1, 60) &&
+             isOptionalStr(data, 'recordId', 128) &&
+             isStr(data.summaryAr, 1, 500) &&
+             isValidTimestamp(data.createdAt);
+    }
+
+    function isValidSyncMetadata(data) {
+      return isValidId(data.ownerUid) &&
+             isStr(data.deviceId, 1, 128) &&
+             isStr(data.entityTable, 1, 60) &&
+             isValidId(data.recordId) &&
+             data.syncStatus in ['Pending', 'Syncing', 'Synced', 'Failed', 'Conflict'] &&
+             data.retryCount is int && data.retryCount >= 0 && data.retryCount <= 1000 &&
+             isOptionalStr(data, 'lastError', 300) &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    // --- 1. profiles ---
+    match /profiles/{profileId} {
+      allow get: if isValidId(profileId) && (
+        isAdmin() ||
+        (isSignedIn() && (profileId == request.auth.uid || existing().ownerUid == request.auth.uid))
+      );
+      allow list: if isBootstrapAdmin() || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+                       isValidId(profileId) &&
+                       isValidProfile(incoming()) &&
+                       incoming().keys().hasAll(['ownerUid', 'username', 'fullName', 'role', 'isActive', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly([
+                         'ownerUid', 'username', 'fullName', 'email', 'phone', 'role', 'isActive',
+                         'canAddCitizen', 'canEditCitizen', 'canDeleteCitizen', 'canViewReports',
+                         'canExport', 'canManageAid', 'canManageAreas', 'canManageUsers',
+                         'canBackupRestore', 'createdAt', 'updatedAt'
+                       ]) && (
+                         (isAdmin() && incoming().ownerUid is string) ||
+                         // Self-registration strictly locked to least-privilege employee role
+                         (profileId == request.auth.uid &&
+                          incoming().ownerUid == request.auth.uid &&
+                          incoming().role == 'employee' &&
+                          incoming().isActive == true &&
+                          (!('canEditCitizen' in incoming()) || incoming().canEditCitizen == false) &&
+                          (!('canDeleteCitizen' in incoming()) || incoming().canDeleteCitizen == false) &&
+                          (!('canManageAid' in incoming()) || incoming().canManageAid == false) &&
+                          (!('canManageAreas' in incoming()) || incoming().canManageAreas == false) &&
+                          (!('canManageUsers' in incoming()) || incoming().canManageUsers == false) &&
+                          (!('canBackupRestore' in incoming()) || incoming().canBackupRestore == false))
+                       );
+
+      allow update: if isSignedIn() &&
+                       isValidId(profileId) &&
+                       isValidProfile(incoming()) &&
+                       incoming().ownerUid == existing().ownerUid &&
+                       incoming().createdAt == existing().createdAt && (
+                         isAdmin() ||
+                         (profileId == request.auth.uid &&
+                          incoming().role == existing().role &&
+                          incoming().isActive == existing().isActive &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'email', 'phone', 'updatedAt']))
+                       );
+
+      allow delete: if isValidId(profileId) && isAdmin();
+    }
+
+    // --- 2. neighborhoods ---
+    match /neighborhoods/{neighborhoodId} {
+      allow get: if isValidId(neighborhoodId) && (isAdmin() || (isSignedIn() && existing().ownerUid == request.auth.uid));
+      allow list: if isBootstrapAdmin() || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+                       isValidId(neighborhoodId) &&
+                       isValidNeighborhood(incoming()) &&
+                       incoming().ownerUid == request.auth.uid &&
+                       incoming().keys().hasAll(['ownerUid', 'name', 'isDeleted', 'syncVersion', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly([
+                         'ownerUid', 'name', 'governorate', 'district', 'aqilProfileId',
+                         'aqilName', 'aqilPhone', 'notes', 'createdByName', 'isDeleted',
+                         'syncVersion', 'createdAt', 'updatedAt'
+                       ]) &&
+                       canManageAreas();
+
+      allow update: if isSignedIn() &&
+                       isValidId(neighborhoodId) &&
+                       isValidNeighborhood(incoming()) &&
+                       incoming().ownerUid == existing().ownerUid &&
+                       incoming().createdAt == existing().createdAt &&
+                       canManageAreas() &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'name', 'governorate', 'district', 'aqilProfileId',
+                         'aqilName', 'aqilPhone', 'notes', 'isDeleted', 'syncVersion', 'updatedAt'
+                       ]);
+
+      allow delete: if isValidId(neighborhoodId) && isAdmin();
+    }
+
+    // --- 3. residential_squares ---
+    match /residential_squares/{squareId} {
+      allow get: if isValidId(squareId) && (isAdmin() || (isSignedIn() && existing().ownerUid == request.auth.uid));
+      allow list: if isBootstrapAdmin() || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+                       isValidId(squareId) &&
+                       isValidResidentialSquare(incoming()) &&
+                       incoming().ownerUid == request.auth.uid &&
+                       incoming().keys().hasAll(['ownerUid', 'neighborhoodId', 'name', 'isDeleted', 'syncVersion', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly([
+                         'ownerUid', 'neighborhoodId', 'name', 'squareCode',
+                         'representativeProfileId', 'representativeName', 'representativePhone',
+                         'notes', 'createdByName', 'isDeleted', 'syncVersion', 'createdAt', 'updatedAt'
+                       ]) &&
+                       canManageAreas() &&
+                       exists(/databases/$(database)/documents/neighborhoods/$(incoming().neighborhoodId));
+
+      allow update: if isSignedIn() &&
+                       isValidId(squareId) &&
+                       isValidResidentialSquare(incoming()) &&
+                       incoming().ownerUid == existing().ownerUid &&
+                       incoming().createdAt == existing().createdAt &&
+                       canManageAreas() &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'neighborhoodId', 'name', 'squareCode', 'representativeProfileId',
+                         'representativeName', 'representativePhone', 'notes', 'isDeleted',
+                         'syncVersion', 'updatedAt'
+                       ]);
+
+      allow delete: if isValidId(squareId) && isAdmin();
+    }
+
+    // --- 4. representatives ---
+    match /representatives/{repHistoryId} {
+      allow get: if isValidId(repHistoryId) && (isAdmin() || (isSignedIn() && existing().ownerUid == request.auth.uid));
+      allow list: if isBootstrapAdmin() || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+                       isValidId(repHistoryId) &&
+                       isValidRepresentative(incoming()) &&
+                       incoming().ownerUid == request.auth.uid &&
+                       incoming().keys().hasAll(['ownerUid', 'profileId', 'roleType', 'neighborhoodId', 'fullName', 'isCurrent', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly([
+                         'ownerUid', 'profileId', 'roleType', 'neighborhoodId', 'squareId',
+                         'fullName', 'phone', 'isCurrent', 'notes', 'createdAt', 'updatedAt'
+                       ]) &&
+                       canManageAreas() &&
+                       exists(/databases/$(database)/documents/neighborhoods/$(incoming().neighborhoodId));
+
+      allow update: if isSignedIn() &&
+                       isValidId(repHistoryId) &&
+                       isValidRepresentative(incoming()) &&
+                       incoming().ownerUid == existing().ownerUid &&
+                       incoming().createdAt == existing().createdAt &&
+                       canManageAreas() &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'fullName', 'phone', 'isCurrent', 'notes', 'updatedAt'
+                       ]);
+
+      allow delete: if isValidId(repHistoryId) && isAdmin();
+    }
+
+    // --- 5. people ---
+    match /people/{personId} {
+      allow get: if isValidId(personId) && (isAdmin() || (isSignedIn() && existing().ownerUid == request.auth.uid));
+      allow list: if isBootstrapAdmin() || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+                       isValidId(personId) &&
+                       isValidPerson(incoming()) &&
+                       incoming().ownerUid == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'ownerUid', 'citizenCode', 'fullName', 'neighborhoodId',
+                         'squareId', 'familySize', 'isDeleted', 'syncVersion',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'ownerUid', 'citizenCode', 'fullName', 'idType', 'nationalId',
+                         'idIssueDate', 'phone', 'governorate', 'district', 'neighborhoodId',
+                         'squareId', 'occupation', 'familySize', 'housingType', 'housingStatus',
+                         'displacementDate', 'healthStatus', 'healthDetails', 'lastAidDate',
+                         'notes', 'createdByName', 'isDeleted', 'syncVersion', 'createdAt', 'updatedAt'
+                       ]) &&
+                       canAddCitizens() &&
+                       exists(/databases/$(database)/documents/neighborhoods/$(incoming().neighborhoodId)) &&
+                       exists(/databases/$(database)/documents/residential_squares/$(incoming().squareId));
+
+      allow update: if isSignedIn() &&
+                       isValidId(personId) &&
+                       isValidPerson(incoming()) &&
+                       incoming().ownerUid == existing().ownerUid &&
+                       incoming().createdAt == existing().createdAt &&
+                       (isAdmin() || (canEditCitizens() && existing().ownerUid == request.auth.uid)) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'citizenCode', 'fullName', 'idType', 'nationalId', 'idIssueDate',
+                         'phone', 'governorate', 'district', 'neighborhoodId', 'squareId',
+                         'occupation', 'familySize', 'housingType', 'housingStatus',
+                         'displacementDate', 'healthStatus', 'healthDetails', 'lastAidDate',
+                         'notes', 'createdByName', 'isDeleted', 'syncVersion', 'updatedAt'
+                       ]);
+
+      allow delete: if isValidId(personId) &&
+                       (isAdmin() || (canDeleteCitizens() && existing().ownerUid == request.auth.uid));
+    }
+
+    // --- 6. identity_documents ---
+    match /identity_documents/{documentId} {
+      allow get: if isValidId(documentId) && (isAdmin() || (isSignedIn() && existing().ownerUid == request.auth.uid));
+      allow list: if isBootstrapAdmin() || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+                       isValidId(documentId) &&
+                       isValidIdentityDocument(incoming()) &&
+                       incoming().ownerUid == request.auth.uid &&
+                       incoming().keys().hasAll(['ownerUid', 'personId', 'documentType', 'side', 'isDeleted', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly([
+                         'ownerUid', 'personId', 'documentType', 'side', 'remoteStoragePath',
+                         'mimeType', 'fileSizeBytes', 'sha256Checksum', 'uploaded',
+                         'isDeleted', 'createdAt', 'updatedAt'
+                       ]) &&
+                       canAddCitizens() &&
+                       exists(/databases/$(database)/documents/people/$(incoming().personId));
+
+      allow update: if isSignedIn() &&
+                       isValidId(documentId) &&
+                       isValidIdentityDocument(incoming()) &&
+                       incoming().ownerUid == existing().ownerUid &&
+                       incoming().personId == existing().personId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isAdmin() &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'documentType', 'side', 'remoteStoragePath', 'mimeType',
+                         'fileSizeBytes', 'sha256Checksum', 'uploaded', 'isDeleted', 'updatedAt'
+                       ]);
+
+      allow delete: if isValidId(documentId) && isAdmin();
+    }
+
+    // --- 7. aid_programs ---
+    match /aid_programs/{programId} {
+      allow get: if isValidId(programId) && (isAdmin() || (isSignedIn() && existing().ownerUid == request.auth.uid));
+      allow list: if isBootstrapAdmin() || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+                       isValidId(programId) &&
+                       isValidAidProgram(incoming()) &&
+                       incoming().ownerUid == request.auth.uid &&
+                       incoming().keys().hasAll(['ownerUid', 'name', 'aidType', 'distributionDate', 'isDeleted', 'syncVersion', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly([
+                         'ownerUid', 'name', 'aidType', 'donorName', 'distributionDate',
+                         'unitLabel', 'defaultQuantity', 'defaultAmount', 'status', 'notes',
+                         'createdByName', 'isDeleted', 'syncVersion', 'createdAt', 'updatedAt'
+                       ]) &&
+                       canManageAid();
+
+      allow update: if isSignedIn() &&
+                       isValidId(programId) &&
+                       isValidAidProgram(incoming()) &&
+                       incoming().ownerUid == existing().ownerUid &&
+                       incoming().createdAt == existing().createdAt &&
+                       canManageAid() &&
+                       (isAdmin() || existing().ownerUid == request.auth.uid) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'name', 'aidType', 'donorName', 'distributionDate', 'unitLabel',
+                         'defaultQuantity', 'defaultAmount', 'status', 'notes',
+                         'isDeleted', 'syncVersion', 'updatedAt'
+                       ]);
+
+      allow delete: if isValidId(programId) && isAdmin();
+    }
+
+    // --- 8. aid_beneficiaries ---
+    match /aid_beneficiaries/{beneficiaryId} {
+      allow get: if isValidId(beneficiaryId) && (isAdmin() || (isSignedIn() && existing().ownerUid == request.auth.uid));
+      allow list: if isBootstrapAdmin() || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+                       isValidId(beneficiaryId) &&
+                       isValidAidBeneficiary(incoming()) &&
+                       incoming().ownerUid == request.auth.uid &&
+                       incoming().keys().hasAll(['ownerUid', 'programId', 'personId', 'isApproved', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly([
+                         'ownerUid', 'programId', 'personId', 'allocatedQuantity',
+                         'allocatedAmount', 'isApproved', 'notes', 'createdAt', 'updatedAt'
+                       ]) &&
+                       canManageAid() &&
+                       exists(/databases/$(database)/documents/aid_programs/$(incoming().programId)) &&
+                       exists(/databases/$(database)/documents/people/$(incoming().personId));
+
+      allow update: if isSignedIn() &&
+                       isValidId(beneficiaryId) &&
+                       isValidAidBeneficiary(incoming()) &&
+                       incoming().ownerUid == existing().ownerUid &&
+                       incoming().programId == existing().programId &&
+                       incoming().personId == existing().personId &&
+                       incoming().createdAt == existing().createdAt &&
+                       canManageAid() &&
+                       (isAdmin() || existing().ownerUid == request.auth.uid) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'allocatedQuantity', 'allocatedAmount', 'isApproved', 'notes', 'updatedAt'
+                       ]);
+
+      allow delete: if isValidId(beneficiaryId) && isAdmin();
+    }
+
+    // --- 9. aid_distributions ---
+    match /aid_distributions/{distributionId} {
+      allow get: if isValidId(distributionId) && (isAdmin() || (isSignedIn() && existing().ownerUid == request.auth.uid));
+      allow list: if isBootstrapAdmin() || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+                       isValidId(distributionId) &&
+                       isValidAidDistribution(incoming()) &&
+                       incoming().ownerUid == request.auth.uid &&
+                       incoming().keys().hasAll(['ownerUid', 'programId', 'personId', 'receivedStatus', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly([
+                         'ownerUid', 'programId', 'beneficiaryId', 'personId',
+                         'quantityDelivered', 'amountDelivered', 'receivedStatus',
+                         'responsibleEmployeeName', 'notes', 'createdAt', 'updatedAt'
+                       ]) &&
+                       (isAdmin() || canManageAid()) &&
+                       exists(/databases/$(database)/documents/aid_programs/$(incoming().programId)) &&
+                       exists(/databases/$(database)/documents/people/$(incoming().personId));
+
+      // Terminal state locking: once delivered ("تم الاستلام"), only Admin can amend
+      allow update: if isSignedIn() &&
+                       isValidId(distributionId) &&
+                       isValidAidDistribution(incoming()) &&
+                       incoming().ownerUid == existing().ownerUid &&
+                       incoming().programId == existing().programId &&
+                       incoming().personId == existing().personId &&
+                       incoming().createdAt == existing().createdAt && (
+                         isAdmin() ||
+                         (canManageAid() &&
+                          existing().ownerUid == request.auth.uid &&
+                          existing().receivedStatus != 'تم الاستلام')
+                       ) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'quantityDelivered', 'amountDelivered', 'receivedStatus',
+                         'responsibleEmployeeName', 'notes', 'updatedAt'
+                       ]);
+
+      allow delete: if isValidId(distributionId) && isAdmin();
+    }
+
+    // --- 10. app_settings ---
+    match /app_settings/{settingId} {
+      allow get: if isValidId(settingId) && (
+        isAdmin() ||
+        isActiveUser() ||
+        (isSignedIn() && existing().ownerUid == request.auth.uid)
+      );
+      allow list: if isBootstrapAdmin() || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+                       isValidId(settingId) &&
+                       isValidAppSettings(incoming()) &&
+                       incoming().ownerUid == request.auth.uid &&
+                       incoming().keys().hasAll(['ownerUid', 'organizationTitle', 'headerFontFamily', 'headerFontSizeSp', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly([
+                         'ownerUid', 'organizationTitle', 'headerSubtitle',
+                         'headerRightText', 'headerLeftText', 'headerFontFamily',
+                         'headerFontSizeSp', 'defaultGovernorate', 'defaultDistrict',
+                         'defaultPaperSize', 'defaultOrientation', 'autoSyncEnabled',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       isAdmin();
+
+      allow update: if isSignedIn() &&
+                       isValidId(settingId) &&
+                       isValidAppSettings(incoming()) &&
+                       incoming().ownerUid == existing().ownerUid &&
+                       incoming().createdAt == existing().createdAt &&
+                       isAdmin() &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'organizationTitle', 'headerSubtitle', 'headerRightText',
+                         'headerLeftText', 'headerFontFamily', 'headerFontSizeSp',
+                         'defaultGovernorate', 'defaultDistrict', 'defaultPaperSize',
+                         'defaultOrientation', 'autoSyncEnabled', 'updatedAt'
+                       ]);
+
+      allow delete: if isValidId(settingId) && isAdmin();
+    }
+
+    // --- 11. audit_logs (immutable append-only) ---
+    match /audit_logs/{logId} {
+      allow get: if isValidId(logId) && (isAdmin() || (isSignedIn() && existing().ownerUid == request.auth.uid));
+      allow list: if isBootstrapAdmin() || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+                       isValidId(logId) &&
+                       isValidAuditLog(incoming()) &&
+                       incoming().ownerUid == request.auth.uid &&
+                       incoming().keys().hasAll(['ownerUid', 'actorUsername', 'actionType', 'tableName', 'summaryAr', 'createdAt']) &&
+                       incoming().keys().hasOnly([
+                         'ownerUid', 'actorUsername', 'actionType', 'tableName',
+                         'recordId', 'summaryAr', 'createdAt'
+                       ]);
+
+      allow update, delete: if false;
+    }
+
+    // --- 12. sync_metadata ---
+    match /sync_metadata/{syncId} {
+      allow get: if isValidId(syncId) && (isAdmin() || (isSignedIn() && existing().ownerUid == request.auth.uid));
+      allow list: if isBootstrapAdmin() || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+                       isValidId(syncId) &&
+                       isValidSyncMetadata(incoming()) &&
+                       incoming().ownerUid == request.auth.uid &&
+                       incoming().keys().hasAll(['ownerUid', 'deviceId', 'entityTable', 'recordId', 'syncStatus', 'retryCount', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly([
+                         'ownerUid', 'deviceId', 'entityTable', 'recordId',
+                         'syncStatus', 'retryCount', 'lastError', 'createdAt', 'updatedAt'
+                       ]);
+
+      allow update: if isSignedIn() &&
+                       isValidId(syncId) &&
+                       isValidSyncMetadata(incoming()) &&
+                       incoming().ownerUid == existing().ownerUid &&
+                       incoming().entityTable == existing().entityTable &&
+                       incoming().recordId == existing().recordId &&
+                       incoming().createdAt == existing().createdAt &&
+                       (isAdmin() || existing().ownerUid == request.auth.uid) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'deviceId', 'syncStatus', 'retryCount', 'lastError', 'updatedAt'
+                       ]);
+
+      allow delete: if isValidId(syncId) && isAdmin();
+    }
+  }
+}

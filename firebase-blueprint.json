@@ -1,0 +1,318 @@
+{
+  "entities": {
+    "ProfileRecord": {
+      "title": "ProfileRecord",
+      "description": "User RBAC profile and permissions stored under /profiles/{profileId}",
+      "type": "object",
+      "properties": {
+        "ownerUid": { "type": "string", "description": "Firebase Auth UID of the account owner" },
+        "username": { "type": "string" },
+        "fullName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "employee", "aqil", "representative"] },
+        "isActive": { "type": "boolean" },
+        "canAddCitizen": { "type": "boolean" },
+        "canEditCitizen": { "type": "boolean" },
+        "canDeleteCitizen": { "type": "boolean" },
+        "canViewReports": { "type": "boolean" },
+        "canExport": { "type": "boolean" },
+        "canManageAid": { "type": "boolean" },
+        "canManageAreas": { "type": "boolean" },
+        "canManageUsers": { "type": "boolean" },
+        "canBackupRestore": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerUid", "username", "fullName", "role", "isActive", "createdAt", "updatedAt"]
+    },
+    "NeighborhoodRecord": {
+      "title": "NeighborhoodRecord",
+      "description": "Neighborhood and assigned Aqil record",
+      "type": "object",
+      "properties": {
+        "ownerUid": { "type": "string" },
+        "name": { "type": "string" },
+        "governorate": { "type": "string" },
+        "district": { "type": "string" },
+        "aqilProfileId": { "type": "string" },
+        "aqilName": { "type": "string" },
+        "aqilPhone": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdByName": { "type": "string" },
+        "isDeleted": { "type": "boolean" },
+        "syncVersion": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerUid", "name", "isDeleted", "syncVersion", "createdAt", "updatedAt"]
+    },
+    "ResidentialSquareRecord": {
+      "title": "ResidentialSquareRecord",
+      "description": "Residential square linked to a parent neighborhood",
+      "type": "object",
+      "properties": {
+        "ownerUid": { "type": "string" },
+        "neighborhoodId": { "type": "string" },
+        "name": { "type": "string" },
+        "squareCode": { "type": "string" },
+        "representativeProfileId": { "type": "string" },
+        "representativeName": { "type": "string" },
+        "representativePhone": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdByName": { "type": "string" },
+        "isDeleted": { "type": "boolean" },
+        "syncVersion": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerUid", "neighborhoodId", "name", "isDeleted", "syncVersion", "createdAt", "updatedAt"]
+    },
+    "RepresentativeHistoryRecord": {
+      "title": "RepresentativeHistoryRecord",
+      "description": "Historical and current assignments for Aqils and Square Representatives",
+      "type": "object",
+      "properties": {
+        "ownerUid": { "type": "string" },
+        "profileId": { "type": "string" },
+        "roleType": { "type": "string", "enum": ["aqil", "representative"] },
+        "neighborhoodId": { "type": "string" },
+        "squareId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "phone": { "type": "string" },
+        "isCurrent": { "type": "boolean" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerUid", "profileId", "roleType", "neighborhoodId", "fullName", "isCurrent", "createdAt", "updatedAt"]
+    },
+    "PersonRecord": {
+      "title": "PersonRecord",
+      "description": "Citizen record belonging to a neighborhood and residential square",
+      "type": "object",
+      "properties": {
+        "ownerUid": { "type": "string" },
+        "citizenCode": { "type": "string" },
+        "fullName": { "type": "string" },
+        "idType": { "type": "string" },
+        "nationalId": { "type": "string" },
+        "idIssueDate": { "type": "string" },
+        "phone": { "type": "string" },
+        "governorate": { "type": "string" },
+        "district": { "type": "string" },
+        "neighborhoodId": { "type": "string" },
+        "squareId": { "type": "string" },
+        "occupation": { "type": "string" },
+        "familySize": { "type": "integer" },
+        "housingType": { "type": "string" },
+        "housingStatus": { "type": "string" },
+        "displacementDate": { "type": "string" },
+        "healthStatus": { "type": "string" },
+        "healthDetails": { "type": "string" },
+        "lastAidDate": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdByName": { "type": "string" },
+        "isDeleted": { "type": "boolean" },
+        "syncVersion": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerUid",
+        "citizenCode",
+        "fullName",
+        "neighborhoodId",
+        "squareId",
+        "familySize",
+        "isDeleted",
+        "syncVersion",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "IdentityDocumentRecord": {
+      "title": "IdentityDocumentRecord",
+      "description": "Metadata and checksum for citizen identity documents",
+      "type": "object",
+      "properties": {
+        "ownerUid": { "type": "string" },
+        "personId": { "type": "string" },
+        "documentType": { "type": "string" },
+        "side": { "type": "string", "enum": ["front", "back", "single"] },
+        "remoteStoragePath": { "type": "string" },
+        "mimeType": { "type": "string" },
+        "fileSizeBytes": { "type": "integer" },
+        "sha256Checksum": { "type": "string" },
+        "uploaded": { "type": "boolean" },
+        "isDeleted": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerUid", "personId", "documentType", "side", "isDeleted", "createdAt", "updatedAt"]
+    },
+    "AidProgramRecord": {
+      "title": "AidProgramRecord",
+      "description": "Aid and relief distribution program",
+      "type": "object",
+      "properties": {
+        "ownerUid": { "type": "string" },
+        "name": { "type": "string" },
+        "aidType": { "type": "string" },
+        "donorName": { "type": "string" },
+        "distributionDate": { "type": "string" },
+        "unitLabel": { "type": "string" },
+        "defaultQuantity": { "type": "number" },
+        "defaultAmount": { "type": "number" },
+        "status": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdByName": { "type": "string" },
+        "isDeleted": { "type": "boolean" },
+        "syncVersion": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerUid", "name", "aidType", "distributionDate", "isDeleted", "syncVersion", "createdAt", "updatedAt"]
+    },
+    "AidBeneficiaryRecord": {
+      "title": "AidBeneficiaryRecord",
+      "description": "Approved beneficiary enrollment in an aid program",
+      "type": "object",
+      "properties": {
+        "ownerUid": { "type": "string" },
+        "programId": { "type": "string" },
+        "personId": { "type": "string" },
+        "allocatedQuantity": { "type": "number" },
+        "allocatedAmount": { "type": "number" },
+        "isApproved": { "type": "boolean" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerUid", "programId", "personId", "isApproved", "createdAt", "updatedAt"]
+    },
+    "AidDistributionRecord": {
+      "title": "AidDistributionRecord",
+      "description": "Aid distribution delivery receipt",
+      "type": "object",
+      "properties": {
+        "ownerUid": { "type": "string" },
+        "programId": { "type": "string" },
+        "beneficiaryId": { "type": "string" },
+        "personId": { "type": "string" },
+        "quantityDelivered": { "type": "number" },
+        "amountDelivered": { "type": "number" },
+        "receivedStatus": { "type": "string" },
+        "responsibleEmployeeName": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerUid", "programId", "personId", "receivedStatus", "createdAt", "updatedAt"]
+    },
+    "AppSettingsRecord": {
+      "title": "AppSettingsRecord",
+      "description": "Global official header, font, and application configuration",
+      "type": "object",
+      "properties": {
+        "ownerUid": { "type": "string" },
+        "organizationTitle": { "type": "string" },
+        "headerSubtitle": { "type": "string" },
+        "headerRightText": { "type": "string" },
+        "headerLeftText": { "type": "string" },
+        "headerFontFamily": { "type": "string" },
+        "headerFontSizeSp": { "type": "number" },
+        "defaultGovernorate": { "type": "string" },
+        "defaultDistrict": { "type": "string" },
+        "defaultPaperSize": { "type": "string" },
+        "defaultOrientation": { "type": "string" },
+        "autoSyncEnabled": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerUid", "organizationTitle", "headerFontFamily", "headerFontSizeSp", "createdAt", "updatedAt"]
+    },
+    "AuditLogRecord": {
+      "title": "AuditLogRecord",
+      "description": "Append-only immutable audit log entry",
+      "type": "object",
+      "properties": {
+        "ownerUid": { "type": "string" },
+        "actorUsername": { "type": "string" },
+        "actionType": { "type": "string" },
+        "tableName": { "type": "string" },
+        "recordId": { "type": "string" },
+        "summaryAr": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerUid", "actorUsername", "actionType", "tableName", "summaryAr", "createdAt"]
+    },
+    "SyncMetadataRecord": {
+      "title": "SyncMetadataRecord",
+      "description": "Device-level synchronization state per entity record",
+      "type": "object",
+      "properties": {
+        "ownerUid": { "type": "string" },
+        "deviceId": { "type": "string" },
+        "entityTable": { "type": "string" },
+        "recordId": { "type": "string" },
+        "syncStatus": { "type": "string", "enum": ["Pending", "Syncing", "Synced", "Failed", "Conflict"] },
+        "retryCount": { "type": "integer" },
+        "lastError": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerUid", "deviceId", "entityTable", "recordId", "syncStatus", "retryCount", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/profiles/{profileId}": {
+      "schema": { "$ref": "#/entities/ProfileRecord" },
+      "description": "User profiles and RBAC role/permission flags"
+    },
+    "/neighborhoods/{neighborhoodId}": {
+      "schema": { "$ref": "#/entities/NeighborhoodRecord" },
+      "description": "Neighborhoods registry"
+    },
+    "/residential_squares/{squareId}": {
+      "schema": { "$ref": "#/entities/ResidentialSquareRecord" },
+      "description": "Residential squares linked to neighborhoods"
+    },
+    "/representatives/{repHistoryId}": {
+      "schema": { "$ref": "#/entities/RepresentativeHistoryRecord" },
+      "description": "Aqil and representative assignment history"
+    },
+    "/people/{personId}": {
+      "schema": { "$ref": "#/entities/PersonRecord" },
+      "description": "Citizens registry records"
+    },
+    "/identity_documents/{documentId}": {
+      "schema": { "$ref": "#/entities/IdentityDocumentRecord" },
+      "description": "Citizen identity document metadata"
+    },
+    "/aid_programs/{programId}": {
+      "schema": { "$ref": "#/entities/AidProgramRecord" },
+      "description": "Aid and relief programs"
+    },
+    "/aid_beneficiaries/{beneficiaryId}": {
+      "schema": { "$ref": "#/entities/AidBeneficiaryRecord" },
+      "description": "Approved aid program beneficiaries"
+    },
+    "/aid_distributions/{distributionId}": {
+      "schema": { "$ref": "#/entities/AidDistributionRecord" },
+      "description": "Aid delivery receipts"
+    },
+    "/app_settings/{settingId}": {
+      "schema": { "$ref": "#/entities/AppSettingsRecord" },
+      "description": "Global application header and font settings"
+    },
+    "/audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLogRecord" },
+      "description": "Append-only security and operation audit trail"
+    },
+    "/sync_metadata/{syncId}": {
+      "schema": { "$ref": "#/entities/SyncMetadataRecord" },
+      "description": "Offline-first synchronization metadata"
+    }
+  }
+}

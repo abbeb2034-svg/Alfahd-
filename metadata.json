@@ -1,0 +1,6 @@
+{
+  "name": "الفهد",
+  "description": "نظام سجل الفهد لإدارة بيانات المواطنين والحارات والمربعات السكنية والمساعدات والإحصائيات مع العمل دون إنترنت والمزامنة التلقائية",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
